@@ -8,8 +8,22 @@ BONUS:
 
 Implement PATCH 2pts
 Implement Filter for GET 2pts
+
 Data persistence: 12pts
 
 Tests: 4pts
 
-Structure, Organization, isolated change (data layer abstraction) as compared to mongo version: 4pts# expressPostgresDemo
+Structure, Organization, isolated change (data layer abstraction) as compared to mongo version: 4pts
+
+
+# expressPostgresDemo
+
+TESTING ORDER
+
+POST, GET, PUT, DELETE
+
+no patch
+no filter
+data persistence via remote postgres resource
+tests
+

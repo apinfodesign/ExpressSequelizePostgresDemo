@@ -1,192 +1,155 @@
 //sequelize postgres
 
+"use strict";
+
 var express 	= require('express');
 var fs 		    = require('fs');
 var router 		= express.Router();
 var path 		= require("path");
 var app         = express();
 var bodyParser  = require('body-parser');
-var Sequelize = require( 'sequelize' );
+app.use(bodyParser.json() );
 
-//    postgres://user:password@host:port/database
+//var data   = require( 'sequelizeFunctions.js' );  //does not work
+//var sequelizeFunctions = require( 'sequelizeFunctions');
+
+
+try {var uristring = require("./env/postgres.js").loginstring;
+}
+catch(err){
+}
+
+var data = data || {};
+
+const Sequelize = require('sequelize');
+//PATTERN    postgres://user:password@host:port/database
 const methodOverride = require( 'method-override' );
-const sequelize = new Sequelize('postgres://sam:123@localhost:5432/foobar');
+const sequelize = new Sequelize(uristring);
 
 
-var user = sequelize.define('user', {
+//Model - offload to model file
+const Employee = sequelize.define('Employee', {
+    //_id: {
+    //    type: Sequelize.STRING,
+    //    primaryKey: true,
+    //    autoIncrement: true
+    //},
     name: {
-        type: Sequelize.STRING
+        type: Sequelize.STRING,
+        allowNull: false
     },
-    hobby: {
-        type: Sequelize.STRING
-    },
-    cost: {
-        type: Sequelize.DECIMAL(10, 2)
+    position: {
+        type: Sequelize.STRING,
+        allowNull: false
     }
 });
 
-app.use(bodyParser.json() );
+
+sequelize.sync();
+
+//should be offloaded to sequelizeFunctions.js
+data.createAndSave = function(res, newEmployee) {
+    if (!Object.keys(newEmployee).length) return res.sendStatus(400);
+    console.log('createAndSave');
+    Employee
+        .create({
+            // _id     : newEmployee._id,
+            name    : newEmployee.name,
+            position: newEmployee.position
+        })
+        .then(
+            function(employee){
+                res.json(employee);    ///send json object called employee
+            })
+        .catch(
+            err => {
+        res.sendStatus(400);
+    console.log(err);
+    });
+};
+
+//find all elements 2
+data.findAllReturn = function(res){
+    Employee.findAll({})
+        .then(
+            employees => {
+            employees = employees.map(employee => employee.toJSON() ) //TODO: recode
+            res.send(employees);
+            })
+        .catch(err => { res.sendStatus(400); console.log(err);});
+};
+
+//find named element 3
+data.findOneReturn = function(res, requestID){
+    console.log(requestID, ' is requestID');
+    Employee.findOne({  where: { id : requestID} })
+        .then( employee => {
+            res.json(employee);
+        })
+        .catch(
+            err => {
+            res.send('Requested record not found.');
+        });
+};
+
+//find and update named element 4
+data.findPutReturn = function(res, requestID, modifiedEmployee){
+    Employee.update(modifiedEmployee, { where: { id : requestID } })
+        .then(
+            () => data.findOneReturn(res, requestID)
+        )
+        .catch(
+            err => {
+            res.sendStatus(400);
+        console.log(err);
+        })
+};
+
+//data.findDeleteReturn 5
+data.deleteAndReturn = function(res, requestID) {
+    Employee.destroy({where: {id: requestID}})
+        .then(
+            numDeleted => res.sendStatus(200)
+        )
+        .catch(
+            err => {
+            res.sendStatus(400);
+            console.log(err);
+    });
+};
 
 
-//top level response
-app.get('/', function(req, res) {
-    res.send('hello postgres!');
+
+
+//ROUTES
+app.post('/api/', function(req, res, next){
+    let newEmployee = req.body;
+    console.log(newEmployee, ' >>>>>>>  is new ');
+    data.createAndSave(res, newEmployee);
 });
 
+app.get('/api/', function(req, res){
+    console.log('get all request');
+    data.findAllReturn(res);
+});
 
-// Pet.sync( /* { force: true } */ )
-// 	.then(function () {
-// 		// Table created
-// 		return Pet.create({
-// 			name: 'tweeety',
-// 			type: 'bird',
-// 			cost: 102.55
-// 		});
-// 	})
-// 	.then( pet => {
-// 		console.log( 'pet created', pet.toJSON() );
-// 	})
-// 	.catch( err => {
-// 		console.log( 'error :(', err );
-// 	});
+app.get('/api/:id', function(req, res){
+    var requestID = req.params.id;
+    console.log('getting one by ID: ', requestID);
+    data.findOneReturn(res, requestID);
+});
 
+app.put('/api/:id', function (req, res){
+    var requestID = req.params.id;
+    var modifiedEmployee = req.body;
+    console.log ('modifiedEmployee is ', modifiedEmployee);
+    data.findPutReturn(res, requestID, modifiedEmployee);
+});
 
-// Pet.findAll({ where: { type: 'bird' } }).then( pets => {
-// 	console.log( pets.map( p => p.toJSON() ) );
-// });
-
-// sequelize.query( 'select type, max(cost) from pets group by type' ).spread( results => {
-// 	console.log( results );
-// });
-
-
-
-
-
-
-//
-////GET - returns list of all objects
-////query parameters define page size and zero based page number
-//
-//app.get('/users', function(req,res,next){
-//
-//    var page = req.query.page;  //zero based
-//    var pageSize = req.query.pageSize;
-//
-//    User.find()
-//        .sort({created: 'descending'})
-//        .limit(pageSize)
-//        .skip(pageSize * page)
-//        .exec(function (err, users) {
-//            if (err) {
-//                return next(err)
-//            }
-//            else {
-//                res.status(201).json(users);
-//            }
-//        })
-//});
-//
-//
-//
-////GET/:id - returns the object specified by that id
-//app.get('/users/:name', function(req,res,next){
-//    res.type('json');
-//    var name = req.params.name;
-//    User.
-//    findOne({
-//        name: name
-//    }).
-//    select ('name').select('hobby').select('interests').
-//    exec(function(err, user){
-//        console.log('you got back : ', user);
-//        if (err)
-//            {return next(err)}
-//            else{
-//                res.status(201).json( user );
-//             }
-//        })
-//});
-//
-//
-////POST create a new object (should return newly created object that has db id to client)
-//
-//app.post('/upload', function(req, res) {
-//    console.log(req.params.body);
-//    if (req.body.name !== null) {
-//        console.log('req.body is: ', req.body);
-//
-//        var user = new User({
-//            name        : req.body.name,
-//            hobby       : req.body.name,
-//            interests   : req.body.interests
-//        });
-//
-//        user.save(function(err){
-//            if (err){
-//                next(err);
-//            } else {
-//                res.status(201).json( user );
-//            }
-//        });
-//    }
-//});
-//
-//
-////PUT/:id updates whole object with all provided data providers
-//app.put('/update/:id', function (req, res) {
-//    if ( req.params.id !== null ){
-//        User.
-//        findById( req.params.id, function(err,user) {
-//            if (err) {res.send(err);}
-//            else {
-//                user.name        = req.body.name;
-//                user.hobby       = req.body.name;
-//                user.interests   = req.body.interests;
-//
-//                user.save(req.params.id, function(err){
-//                    if (err) {
-//                        res.send(err);
-//                    }
-//                    else {
-//                        res.json(user);
-//                    }
-//                });
-//            }
-//        });
-//    };
-//});
-//
-////PATCH does not work
-//app.patch('/update/:id', function(req,res){
-//    if (req.params.id !== null ){
-//        User.
-//        findByID (req.params.id , function (err, user){
-//            if (err){res.send(err);
-//            }
-//            else {
-//                res.json({message: " patch update completed "});
-//            }
-//        });
-//    };
-//});
-//
-//
-////DELETE/:id delete the object specified by that id
-//app.delete('/delete/:id', function (req, res) {
-//    if (req.params.id !== null){
-//        console.log('OOO>>>', req.params.id);
-//
-//        User.
-//        findByIdAndRemove( req.params.id, function(err,user) {
-//            if (err){
-//                res.send(err);
-//            } else {
-//                res.json({ message: 'Record has been deleted.' });
-//            }
-//        });
-//    }
-//});
+app.delete('/api/:id', function(req,res){
+    var requestID = req.params.id;
+    data.deleteAndReturn(res, requestID);
+});
 
 
 module.exports = app;

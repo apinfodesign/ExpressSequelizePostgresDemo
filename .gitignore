@@ -3,3 +3,7 @@ node*
 data
 data*
 databaselogin.js
+idea
+*idea*
+env
+env/postgres
